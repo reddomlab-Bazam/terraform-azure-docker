@@ -1,0 +1,31 @@
+persistence:
+  enabled: true
+  storageClassName: managed-premium
+  size: 10Gi
+
+adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+    - name: Wazuh
+      type: elasticsearch
+      url: http://wazuh-indexer-indexer:9200
+      database: wazuh-*
+      jsonData:
+        timeField: "@timestamp"
+        esVersion: "7.10.2"
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /var/lib/grafana/dashboards/default

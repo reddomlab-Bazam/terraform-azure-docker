@@ -1,0 +1,47 @@
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['job']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'null'
+      routes:
+      - match:
+          alertname: Watchdog
+        receiver: 'null'
+    receivers:
+    - name: 'null'
+
+grafana:
+  enabled: false  # We're using our own Grafana installation
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 200Mi
+    limits:
+      cpu: 400m
+      memory: 400Mi
+
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 400Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-premium
+          resources:
+            requests:
+              storage: 50Gi

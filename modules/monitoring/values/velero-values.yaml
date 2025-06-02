@@ -1,0 +1,42 @@
+configuration:
+  provider: azure
+  backupStorageLocation:
+    name: azure
+    provider: azure
+    bucket: velero-backups
+    config:
+      resourceGroup: aks-uks-prd-rg
+      storageAccount: aksbackupsprd
+      subscriptionId: ${AZURE_SUBSCRIPTION_ID}
+
+initContainers:
+- name: velero-plugin-for-azure
+  image: velero/velero-plugin-for-microsoft-azure:v1.5.0
+  volumeMounts:
+  - mountPath: /target
+    name: plugins
+
+credentials:
+  useSecret: true
+  secretContents:
+    cloud: |
+      AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+      AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      AZURE_RESOURCE_GROUP=aks-uks-prd-rg
+      AZURE_CLOUD_NAME=AzurePublicCloud
+
+schedules:
+  daily-backup:
+    schedule: "0 1 * * *"
+    template:
+      ttl: "240h"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 400m
+    memory: 512Mi
