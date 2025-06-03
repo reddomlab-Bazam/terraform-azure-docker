@@ -588,7 +588,7 @@ EOF
   depends_on = [kubernetes_namespace.monitoring]
 }
 
-# Network policy to secure the monitoring namespace
+# Network policy to secure the monitoring namespace - FIXED: Proper peer specifications
 resource "kubernetes_network_policy" "monitoring_network_policy" {
   metadata {
     name      = "monitoring-network-policy"
@@ -604,7 +604,7 @@ resource "kubernetes_network_policy" "monitoring_network_policy" {
       from {
         namespace_selector {
           match_labels = {
-            name = "monitoring"
+            purpose = "monitoring"
           }
         }
       }
@@ -612,7 +612,7 @@ resource "kubernetes_network_policy" "monitoring_network_policy" {
       from {
         namespace_selector {
           match_labels = {
-            name = "wazuh"
+            purpose = "security-monitoring"
           }
         }
       }
@@ -622,7 +622,7 @@ resource "kubernetes_network_policy" "monitoring_network_policy" {
       to {
         namespace_selector {
           match_labels = {
-            name = "wazuh"
+            purpose = "security-monitoring"
           }
         }
       }
@@ -639,6 +639,13 @@ resource "kubernetes_network_policy" "monitoring_network_policy" {
       ports {
         protocol = "TCP"
         port     = "443"
+      }
+      
+      # Allow egress to HTTP
+      to {}
+      ports {
+        protocol = "TCP"
+        port     = "80"
       }
     }
   }

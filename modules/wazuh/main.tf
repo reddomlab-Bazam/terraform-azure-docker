@@ -115,7 +115,7 @@ resource "local_file" "deploy_wazuh_script" {
   file_permission = "0755"
 }
 
-# Execute the Wazuh deployment script
+# Execute the Wazuh deployment script - FIXED: Use bash explicitly and correct path
 resource "null_resource" "deploy_wazuh" {
   depends_on = [
     kubernetes_namespace.wazuh,
@@ -124,7 +124,7 @@ resource "null_resource" "deploy_wazuh" {
   ]
 
   provisioner "local-exec" {
-    command     = "${local_file.deploy_wazuh_script.filename}"
+    command     = "bash ${local_file.deploy_wazuh_script.filename}"
     working_dir = path.module
     
     environment = {
@@ -187,7 +187,7 @@ resource "kubernetes_config_map" "wazuh_config" {
         </auth>
 
         <cluster>
-          <name>wazuh</name>
+          <n>wazuh</n>
           <node_name>master-node</node_name>
           <node_type>master</node_type>
           <key></key>
@@ -320,7 +320,7 @@ resource "kubernetes_deployment" "wazuh_health_check" {
   depends_on = [kubernetes_namespace.wazuh]
 }
 
-# Network policy for Wazuh namespace
+# Network policy for Wazuh namespace - FIXED: Proper peer specifications
 resource "kubernetes_network_policy" "wazuh_network_policy" {
   metadata {
     name      = "wazuh-network-policy"
@@ -344,11 +344,7 @@ resource "kubernetes_network_policy" "wazuh_network_policy" {
       
       # Allow ingress within wazuh namespace
       from {
-        namespace_selector {
-          match_labels = {
-            name = "wazuh"
-          }
-        }
+        pod_selector {}
       }
       
       # Allow specific ports
@@ -378,25 +374,28 @@ resource "kubernetes_network_policy" "wazuh_network_policy" {
       
       # Allow egress within wazuh namespace
       to {
-        namespace_selector {
-          match_labels = {
-            name = "wazuh"
-          }
-        }
+        pod_selector {}
       }
       
-      # Allow DNS
+      # Allow DNS resolution
       to {}
       ports {
         protocol = "UDP"
         port     = "53"
       }
       
-      # Allow HTTPS for updates
+      # Allow HTTPS for updates and external connectivity
       to {}
       ports {
         protocol = "TCP"
         port     = "443"
+      }
+      
+      # Allow HTTP for internal communication
+      to {}
+      ports {
+        protocol = "TCP"
+        port     = "80"
       }
     }
   }
