@@ -245,49 +245,70 @@ resource "kubernetes_service" "grafana" {
   depends_on = [kubernetes_deployment.grafana]
 }
 
-# Simplified Prometheus deployment using kube-prometheus-stack
+# MUCH simpler Prometheus deployment - just core prometheus
 resource "helm_release" "prometheus" {
   name       = "prometheus"
   repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "kube-prometheus-stack"
+  chart      = "prometheus"  # Just prometheus, not the full stack
   namespace  = kubernetes_namespace.monitoring.metadata[0].name
-  version    = "55.5.0"
-  timeout    = 300  # 5 minutes instead of 10
+  version    = "25.8.0"
+  timeout    = 180  # 3 minutes
   
-  # Simplified values for faster deployment
+  # Minimal configuration for faster deployment
   set {
-    name  = "grafana.enabled"
-    value = "false"  # We have our own Grafana
+    name  = "server.retention"
+    value = "7d"
   }
   
   set {
-    name  = "alertmanager.enabled"
-    value = "false"  # Disable to speed up deployment
-  }
-  
-  set {
-    name  = "prometheus.prometheusSpec.retention"
-    value = "7d"  # Shorter retention
-  }
-  
-  set {
-    name  = "prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName"
+    name  = "server.persistentVolume.storageClass"
     value = "managed-premium"
   }
   
   set {
-    name  = "prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage"
-    value = "10Gi"  # Smaller storage
+    name  = "server.persistentVolume.size"
+    value = "5Gi"  # Even smaller
   }
   
   set {
-    name  = "prometheus.prometheusSpec.resources.requests.memory"
-    value = "400Mi"  # Reduced memory
+    name  = "server.resources.requests.memory"
+    value = "256Mi"  # Much smaller
   }
   
   set {
-    name  = "prometheus.prometheusSpec.resources.requests.cpu"
-    value = "200m"  # Reduced CPU
+    name  = "server.resources.requests.cpu"
+    value = "100m"  # Much smaller
+  }
+  
+  set {
+    name  = "server.resources.limits.memory"
+    value = "512Mi"
+  }
+  
+  set {
+    name  = "server.resources.limits.cpu"
+    value = "200m"
+  }
+  
+  # Disable components we don't need
+  set {
+    name  = "alertmanager.enabled"
+    value = "false"
+  }
+  
+  set {
+    name  = "prometheus-pushgateway.enabled"
+    value = "false"
+  }
+  
+  set {
+    name  = "kube-state-metrics.enabled"
+    value = "false"  # Disable for now
+  }
+  
+  set {
+    name  = "prometheus-node-exporter.enabled"
+    value = "false"  # Disable for now
   }
 
   depends_on = [kubernetes_namespace.monitoring]
