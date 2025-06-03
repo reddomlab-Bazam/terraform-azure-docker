@@ -415,9 +415,174 @@ resource "kubernetes_config_map" "lab_documentation" {
   }
 
   data = {
-    "instructions.md" = file("${path.module}/docs/lab_instructions.md")
-    "architecture.md" = file("${path.module}/docs/architecture.md")
-    "exercises.md"    = file("${path.module}/docs/exercises.md")
+    "instructions.md" = <<-EOF
+# RedDome Lab - Student Instructions
+
+## Overview
+This lab provides hands-on experience with a modern DevSecOps monitoring stack running on Azure Kubernetes Service (AKS). You'll work with Wazuh for security monitoring, Grafana for visualization, and secure the deployment with Cloudflare tunnels.
+
+## Getting Started
+
+### 1. Access Your Environment
+- Grafana Dashboard: https://grafana.reddomelab.com
+- Wazuh Dashboard: https://wazuh.reddomelab.com
+
+Default credentials are provided by your instructor.
+
+### 2. Lab Environment Components
+- AKS Cluster with Azure CNI networking and Calico network policy
+- Wazuh security monitoring platform
+- Grafana metrics visualization
+- Prometheus metrics collection
+- Cloudflare tunnels for secure access
+
+### 3. Tasks to Complete
+1. **Explore the Monitoring Stack**
+   - Navigate Grafana dashboards
+   - Examine Wazuh security alerts
+   - Understand how components communicate
+
+2. **Security Analysis**
+   - Review network security group rules
+   - Analyze Wazuh security configurations
+   - Examine Cloudflare tunnel settings
+
+3. **Infrastructure Scaling**
+   - Modify autoscaling settings for the AKS node pool
+   - Observe how resources are allocated
+
+## Troubleshooting Tips
+
+If you encounter issues:
+1. Check connection to Cloudflare tunnels
+2. Verify Kubernetes resource usage
+3. Review service logs in AKS
+4. Consult your instructor if needed
+
+## Additional Resources
+- Azure AKS documentation
+- Terraform documentation
+- Wazuh user manual
+- Grafana documentation
+EOF
+
+    "architecture.md" = <<-EOF
+# RedDome Lab - Architecture Overview
+
+## Network Flow
+Internet → Cloudflare → Tunnels → AKS Cluster → Monitoring Services
+
+## Security Architecture
+
+### Perimeter Security
+- Cloudflare tunnels for secure external access
+- Network Security Groups controlling subnet access
+
+### Cluster Security
+- AKS cluster with API server IP restrictions
+- RBAC enabled for fine-grained access control
+- Microsoft Defender for Kubernetes enabled
+- Azure Policy integration
+
+### Monitoring Security
+- Wazuh for security event monitoring and SIEM
+- Azure Monitor for platform metrics
+- Prometheus for application metrics
+- Network policy enforcement with Calico
+
+## High Availability
+- AKS node pool configured for auto-scaling (1-3 nodes)
+- Resource limits configured to ensure stability
+
+## Components Diagram
+```
++----------------+      +----------------+      +----------------+
+|                |      |                |      |                |
+|   Internet     +----->+   Cloudflare   +----->+  AKS Cluster   |
+|                |      |                |      |                |
++----------------+      +----------------+      +-------+--------+
+                                                         |
+                    +------------------------------------+
+                    |
+    +---------------v---------+----------v---------+----------v----------+
+    |                         |                    |                     |
++---v----+              +-----v-----+         +----v-------+
+|        |              |           |         |            |
+| Wazuh  |              | Grafana   |         | Prometheus |
+|        |              |           |         |            |
++--------+              +-----------+         +------------+
+```
+EOF
+
+    "exercises.md" = <<-EOF
+# RedDome Lab - Student Exercises
+
+## Exercise 1: Security Assessment
+
+**Objective**: Perform a security assessment of the RedDome Lab infrastructure.
+
+**Tasks**:
+1. Review network security configuration in Azure
+   - Examine NSG rules
+   - Analyze network configurations
+   - Identify potential security gaps
+
+2. Assess Kubernetes security posture
+   - Review RBAC configurations
+   - Check for privileged containers
+   - Verify network policies
+
+3. Analyze Wazuh security alerts
+   - Review default rule set
+   - Identify triggered alerts
+   - Recommend security improvements
+
+**Deliverable**: Security assessment report with findings and recommendations
+
+## Exercise 2: Monitoring Configuration
+
+**Objective**: Configure comprehensive monitoring for the infrastructure.
+
+**Tasks**:
+1. Set up Grafana dashboards
+   - Create a dashboard for AKS node metrics
+   - Configure alerts for resource utilization thresholds
+   - Create a security events visualization
+
+2. Configure Prometheus metrics collection
+   - Set up custom metrics for application monitoring
+   - Configure alert rules for critical services
+   - Implement logging for alert triggers
+
+3. Integrate Wazuh with external systems
+   - Configure email notifications
+   - Set up integration with ticketing system (mock)
+   - Establish alerting thresholds
+
+**Deliverable**: Monitoring configuration documentation with screenshots
+
+## Exercise 3: Infrastructure Analysis
+
+**Objective**: Analyze the deployed infrastructure and optimize performance.
+
+**Tasks**:
+1. Resource utilization analysis
+   - Monitor CPU and memory usage across nodes
+   - Identify bottlenecks and optimization opportunities
+   - Recommend scaling strategies
+
+2. Security monitoring effectiveness
+   - Evaluate Wazuh detection capabilities
+   - Test security event generation
+   - Assess alert quality and reduce false positives
+
+3. Network performance analysis
+   - Test connectivity between components
+   - Measure latency and throughput
+   - Optimize network configurations
+
+**Deliverable**: Infrastructure analysis report with optimization recommendations
+EOF
   }
 
   depends_on = [kubernetes_namespace.monitoring]
