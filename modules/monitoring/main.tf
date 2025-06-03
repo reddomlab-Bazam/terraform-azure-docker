@@ -372,7 +372,7 @@ resource "null_resource" "wazuh_integration_check" {
     EOT
   }
 
-  depends_on = [helm_release.prometheus, kubernetes_deployment.grafana]
+  depends_on = [kubernetes_deployment.grafana]
 }
 
 # Network policy to secure the monitoring namespace - FIXED VERSION
