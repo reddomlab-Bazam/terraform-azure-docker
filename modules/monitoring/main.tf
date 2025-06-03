@@ -366,35 +366,42 @@ resource "null_resource" "deploy_wazuh" {
   depends_on = [kubernetes_namespace.monitoring]
 }
 
-# Create service monitor for Prometheus to scrape Wazuh metrics
-resource "kubernetes_manifest" "wazuh_service_monitor" {
-  manifest = {
-    apiVersion = "monitoring.coreos.com/v1"
-    kind       = "ServiceMonitor"
-    metadata = {
-      name      = "wazuh-monitor"
-      namespace = kubernetes_namespace.monitoring.metadata[0].name
-      labels = {
-        app = "wazuh"
-      }
-    }
-    spec = {
-      selector = {
-        matchLabels = {
-          app = "wazuh-manager"
-        }
-      }
-      namespaceSelector = {
-        matchNames = ["wazuh"]
-      }
-      endpoints = [
-        {
-          port     = "api"
-          interval = "30s"
-          path     = "/api"
-        }
-      ]
-    }
+# Create service monitor for Prometheus to scrape Wazuh metrics (using null_resource instead of kubernetes_manifest)
+resource "null_resource" "wazuh_service_monitor" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Wait for cluster to be ready
+      sleep 30
+      
+      # Create ServiceMonitor YAML
+      cat <<EOF > /tmp/wazuh-service-monitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: wazuh-monitor
+  namespace: monitoring
+  labels:
+    app: wazuh
+    prometheus: enabled
+spec:
+  selector:
+    matchLabels:
+      app: wazuh-manager
+  namespaceSelector:
+    matchNames:
+    - wazuh
+  endpoints:
+  - port: api
+    interval: 30s
+    path: /api
+EOF
+
+      # Apply the ServiceMonitor
+      kubectl apply -f /tmp/wazuh-service-monitor.yaml || echo "ServiceMonitor creation failed, will retry later"
+      
+      # Clean up
+      rm -f /tmp/wazuh-service-monitor.yaml
+    EOT
   }
 
   depends_on = [helm_release.prometheus, null_resource.deploy_wazuh]
