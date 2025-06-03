@@ -307,6 +307,7 @@ resource "helm_release" "prometheus" {
   values = [
     templatefile("${path.module}/values/prometheus-values.yaml", {
       STORAGE_CLASS = "managed-premium"
+      DOMAIN_NAME   = var.domain_name  # ADDED: Pass the domain name variable
     })
   ]
 
@@ -329,8 +330,8 @@ resource "null_resource" "deploy_wazuh" {
       fi
       
       # Create a temporary directory for Wazuh manifests
-      TEMP_DIR=$(mktemp -d)
-      cd $TEMP_DIR
+      TEMP_DIR=$$(mktemp -d)
+      cd $$TEMP_DIR
       
       # Clone the official Wazuh Kubernetes repository
       echo "Cloning Wazuh Kubernetes repository..."
@@ -356,7 +357,7 @@ resource "null_resource" "deploy_wazuh" {
       kubectl apply -f wazuh/manager/
       
       # Clean up
-      rm -rf $TEMP_DIR
+      rm -rf $$TEMP_DIR
       
       echo "Wazuh deployment completed successfully"
     EOT
