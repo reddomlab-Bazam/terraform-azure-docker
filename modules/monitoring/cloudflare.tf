@@ -23,7 +23,6 @@ resource "helm_release" "cloudflared_grafana" {
     command = <<-EOT
       echo "Waiting for Grafana tunnel to be ready..."
       sleep 60
-      kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cloudflared -n ${kubernetes_namespace.monitoring.metadata[0].name} --timeout=300s
     EOT
   }
 }
@@ -37,8 +36,8 @@ resource "helm_release" "cloudflared_wazuh" {
   version    = "1.3.0"
   timeout    = 600
   
-  # Wait for Wazuh to be deployed before creating tunnel
-  depends_on = [null_resource.deploy_wazuh]
+  # Wait for Wazuh to be deployed before creating tunnel - FIXED DEPENDENCY
+  depends_on = [null_resource.wazuh_integration_check]
 
   values = [
     templatefile("${path.module}/values/cloudflare-wazuh-values.yaml", {
@@ -53,7 +52,6 @@ resource "helm_release" "cloudflared_wazuh" {
     command = <<-EOT
       echo "Waiting for Wazuh tunnel to be ready..."
       sleep 60
-      kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cloudflared -n ${kubernetes_namespace.monitoring.metadata[0].name} --timeout=300s
     EOT
   }
 }
