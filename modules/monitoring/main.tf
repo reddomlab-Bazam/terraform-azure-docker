@@ -135,189 +135,6 @@ resource "kubernetes_deployment" "grafana" {
           }
           
           port {
-      port        = 80
-      target_port = 80
-      protocol    = "TCP"
-    }
-    type = "ClusterIP"
-  }
-}
-
-# Simple nginx deployment for tunnel testing
-resource "kubernetes_deployment" "tunnel_health_check" {
-  metadata {
-    name      = "tunnel-health-check"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
-  }
-  
-  spec {
-    replicas = 1
-    
-    selector {
-      match_labels = {
-        app = "nginx"
-      }
-    }
-    
-    template {
-      metadata {
-        labels = {
-          app = "nginx"
-        }
-      }
-      
-      spec {
-        container {
-          name  = "nginx"
-          image = "nginx:alpine"
-          
-          resources {
-            requests = {
-              cpu    = "10m"
-              memory = "16Mi"
-            }
-            limits = {
-              cpu    = "50m"
-              memory = "64Mi"
-            }
-          }
-          
-          port {
-            container_port = 80
-            protocol       = "TCP"
-          }
-        }
-      }
-    }
-  }
-}
-
-# Enhanced Cloudflare tunnel configuration for Grafana
-resource "helm_release" "cloudflared_grafana" {
-  name       = "cloudflared-grafana"
-  repository = "https://charts.pascaliske.dev"
-  chart      = "cloudflared"
-  namespace  = kubernetes_namespace.monitoring.metadata[0].name
-  version    = "1.3.0"
-  timeout    = 600
-  
-  # Wait for Grafana to be ready before deploying tunnel
-  depends_on = [kubernetes_deployment.grafana, kubernetes_service.grafana]
-
-  values = [
-    templatefile("${path.module}/values/cloudflare-grafana-values.yaml", {
-      CLOUDFLARE_TUNNEL_TOKEN_GRAFANA = var.cloudflare_tunnel_token_grafana
-      GRAFANA_SUBDOMAIN               = var.grafana_subdomain
-      DOMAIN_NAME                     = var.domain_name
-    })
-  ]
-
-  # Health check to ensure tunnel is properly configured
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Waiting for Grafana tunnel to be ready..."
-      sleep 60
-    EOT
-  }
-}
-
-# Enhanced Cloudflare tunnel configuration for Wazuh
-resource "helm_release" "cloudflared_wazuh" {
-  name       = "cloudflared-wazuh"
-  repository = "https://charts.pascaliske.dev"
-  chart      = "cloudflared"
-  namespace  = kubernetes_namespace.monitoring.metadata[0].name
-  version    = "1.3.0"
-  timeout    = 600
-
-  values = [
-    templatefile("${path.module}/values/cloudflare-wazuh-values.yaml", {
-      CLOUDFLARE_TUNNEL_TOKEN_WAZUH = var.cloudflare_tunnel_token_wazuh
-      WAZUH_SUBDOMAIN               = var.wazuh_subdomain
-      DOMAIN_NAME                   = var.domain_name
-    })
-  ]
-
-  # Health check to ensure tunnel is properly configured
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Waiting for Wazuh tunnel to be ready..."
-      sleep 60
-    EOT
-  }
-}
-
-# Create service monitor for Prometheus to scrape Wazuh metrics
-resource "null_resource" "wazuh_service_monitor" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Wazuh service monitor configuration completed"
-      echo "ServiceMonitor will be created automatically by Prometheus"
-    EOT
-  }
-
-  depends_on = [helm_release.prometheus]
-}
-
-# Network policy to secure the monitoring namespace - FIXED VERSION
-resource "kubernetes_network_policy" "monitoring_network_policy" {
-  metadata {
-    name      = "monitoring-network-policy"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
-  }
-
-  spec {
-    pod_selector {}
-    
-    policy_types = ["Ingress", "Egress"]
-    
-    ingress {
-      from {
-        namespace_selector {
-          match_labels = {
-            purpose = "monitoring"
-          }
-        }
-      }
-      
-      from {
-        namespace_selector {
-          match_labels = {
-            purpose = "security-monitoring"
-          }
-        }
-      }
-    }
-    
-    egress {
-      to {
-        namespace_selector {
-          match_labels = {
-            purpose = "security-monitoring"
-          }
-        }
-      }
-      
-      # DNS and external access - FIXED: Proper port-only rules
-      ports {
-        protocol = "UDP"
-        port     = "53"
-      }
-      
-      ports {
-        protocol = "TCP"
-        port     = "443"
-      }
-      
-      ports {
-        protocol = "TCP"
-        port     = "80"
-      }
-    }
-  }
-
-  depends_on = [kubernetes_namespace.monitoring]
-}
             container_port = 3000
             name           = "http-grafana"
             protocol       = "TCP"
@@ -693,3 +510,186 @@ resource "kubernetes_service" "tunnel_health_check" {
       app = "nginx"
     }
     port {
+      port        = 80
+      target_port = 80
+      protocol    = "TCP"
+    }
+    type = "ClusterIP"
+  }
+}
+
+# Simple nginx deployment for tunnel testing
+resource "kubernetes_deployment" "tunnel_health_check" {
+  metadata {
+    name      = "tunnel-health-check"
+    namespace = kubernetes_namespace.monitoring.metadata[0].name
+  }
+  
+  spec {
+    replicas = 1
+    
+    selector {
+      match_labels = {
+        app = "nginx"
+      }
+    }
+    
+    template {
+      metadata {
+        labels = {
+          app = "nginx"
+        }
+      }
+      
+      spec {
+        container {
+          name  = "nginx"
+          image = "nginx:alpine"
+          
+          resources {
+            requests = {
+              cpu    = "10m"
+              memory = "16Mi"
+            }
+            limits = {
+              cpu    = "50m"
+              memory = "64Mi"
+            }
+          }
+          
+          port {
+            container_port = 80
+            protocol       = "TCP"
+          }
+        }
+      }
+    }
+  }
+}
+
+# Enhanced Cloudflare tunnel configuration for Grafana
+resource "helm_release" "cloudflared_grafana" {
+  name       = "cloudflared-grafana"
+  repository = "https://charts.pascaliske.dev"
+  chart      = "cloudflared"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  version    = "1.3.0"
+  timeout    = 600
+  
+  # Wait for Grafana to be ready before deploying tunnel
+  depends_on = [kubernetes_deployment.grafana, kubernetes_service.grafana]
+
+  values = [
+    templatefile("${path.module}/values/cloudflare-grafana-values.yaml", {
+      CLOUDFLARE_TUNNEL_TOKEN_GRAFANA = var.cloudflare_tunnel_token_grafana
+      GRAFANA_SUBDOMAIN               = var.grafana_subdomain
+      DOMAIN_NAME                     = var.domain_name
+    })
+  ]
+
+  # Health check to ensure tunnel is properly configured
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Waiting for Grafana tunnel to be ready..."
+      sleep 60
+    EOT
+  }
+}
+
+# Enhanced Cloudflare tunnel configuration for Wazuh
+resource "helm_release" "cloudflared_wazuh" {
+  name       = "cloudflared-wazuh"
+  repository = "https://charts.pascaliske.dev"
+  chart      = "cloudflared"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  version    = "1.3.0"
+  timeout    = 600
+
+  values = [
+    templatefile("${path.module}/values/cloudflare-wazuh-values.yaml", {
+      CLOUDFLARE_TUNNEL_TOKEN_WAZUH = var.cloudflare_tunnel_token_wazuh
+      WAZUH_SUBDOMAIN               = var.wazuh_subdomain
+      DOMAIN_NAME                   = var.domain_name
+    })
+  ]
+
+  # Health check to ensure tunnel is properly configured
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Waiting for Wazuh tunnel to be ready..."
+      sleep 60
+    EOT
+  }
+}
+
+# Create service monitor for Prometheus to scrape Wazuh metrics
+resource "null_resource" "wazuh_service_monitor" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Wazuh service monitor configuration completed"
+      echo "ServiceMonitor will be created automatically by Prometheus"
+    EOT
+  }
+
+  depends_on = [helm_release.prometheus]
+}
+
+# Network policy to secure the monitoring namespace - FIXED VERSION
+resource "kubernetes_network_policy" "monitoring_network_policy" {
+  metadata {
+    name      = "monitoring-network-policy"
+    namespace = kubernetes_namespace.monitoring.metadata[0].name
+  }
+
+  spec {
+    pod_selector {}
+    
+    policy_types = ["Ingress", "Egress"]
+    
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            purpose = "monitoring"
+          }
+        }
+      }
+      
+      from {
+        namespace_selector {
+          match_labels = {
+            purpose = "security-monitoring"
+          }
+        }
+      }
+    }
+    
+    egress {
+      to {
+        namespace_selector {
+          match_labels = {
+            purpose = "security-monitoring"
+          }
+        }
+      }
+      
+      # DNS and external access - FIXED: Proper port-only rules
+      ports {
+        protocol = "UDP"
+        port     = "53"
+      }
+      
+      ports {
+        protocol = "TCP"
+        port     = "443"
+      }
+      
+      ports {
+        protocol = "TCP"
+        port     = "80"
+      }
+    }
+  }
+
+  depends_on = [kubernetes_namespace.monitoring]
+}
