@@ -115,7 +115,7 @@ resource "local_file" "deploy_wazuh_script" {
   file_permission = "0755"
 }
 
-# Execute the Wazuh deployment script - FIXED: Correct path reference
+# Execute the Wazuh deployment script - FIXED: Use absolute path reference
 resource "null_resource" "deploy_wazuh" {
   depends_on = [
     kubernetes_namespace.wazuh,
@@ -124,8 +124,8 @@ resource "null_resource" "deploy_wazuh" {
   ]
 
   provisioner "local-exec" {
-    command     = "bash ${local_file.deploy_wazuh_script.filename}"
-    working_dir = path.module
+    command = "bash ${local_file.deploy_wazuh_script.filename}"
+    # Remove working_dir since we're using absolute path
     
     environment = {
       KUBECONFIG = "~/.kube/config"
