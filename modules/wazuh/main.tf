@@ -35,12 +35,12 @@ resource "kubernetes_service" "wazuh_indexer" {
     namespace = kubernetes_namespace.wazuh.metadata[0].name
   }
   spec {
-    ports {
+    port {
       port        = 9200
       name        = "indexer-rest"
       protocol    = "TCP"
     }
-    ports {
+    port {
       port        = 9300
       name        = "indexer-nodes"
       protocol    = "TCP"
@@ -153,17 +153,17 @@ resource "kubernetes_service" "wazuh_manager" {
     namespace = kubernetes_namespace.wazuh.metadata[0].name
   }
   spec {
-    ports {
+    port {
       port        = 1514
       name        = "agents"
       protocol    = "TCP"
     }
-    ports {
+    port {
       port        = 1515
       name        = "authd"
       protocol    = "TCP"
     }
-    ports {
+    port {
       port        = 55000
       name        = "api"
       protocol    = "TCP"
@@ -275,7 +275,7 @@ resource "kubernetes_service" "wazuh_dashboard" {
     namespace = kubernetes_namespace.wazuh.metadata[0].name
   }
   spec {
-    ports {
+    port {
       port        = 443
       target_port = 5601
       name        = "dashboard"
