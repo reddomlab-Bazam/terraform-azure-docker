@@ -1,0 +1,60 @@
+# Azure Infrastructure Configuration Template
+# Copy this file to terraform.tfvars and fill in your values
+
+# Environment Configuration
+environment     = "prd"
+location        = "uksouth"
+location_prefix = "uks"
+
+# Domain Configuration (REQUIRED)
+domain_name       = "yourdomain.com"  # Replace with your actual domain
+grafana_subdomain = "grafana"
+wazuh_subdomain   = "wazuh"
+
+# Grafana Configuration (REQUIRED - Set in Terraform Cloud as sensitive)
+# grafana_admin_password = "your-secure-password-here"
+
+# Cloudflare Tunnel Configuration (REQUIRED - Set in Terraform Cloud as sensitive)
+# Get these tokens from Cloudflare Zero Trust dashboard
+# cloudflare_tunnel_token_grafana = "your-grafana-tunnel-token"
+# cloudflare_tunnel_token_wazuh   = "your-wazuh-tunnel-token"
+
+# Network Security (REQUIRED - Set in Terraform Cloud as sensitive)
+# Replace with your actual IP ranges
+# api_authorized_ranges = ["203.0.113.0/24", "198.51.100.0/24"]
+
+# Azure Monitor Integration (REQUIRED)
+# Get this from your existing Log Analytics workspace
+log_analytics_workspace_id = "/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.OperationalInsights/workspaces/your-workspace"
+
+# AKS Configuration (Optional - defaults provided)
+kubernetes_version = "1.28.5"  # Use a stable version
+node_count        = 2          # Minimum for high availability
+vm_size           = "Standard_D2s_v3"
+
+# Monitoring Configuration (Optional)
+enable_monitoring = true
+
+# Optional: Cloudflare Zero Trust Integration
+# Uncomment and configure if you want to integrate with existing Zero Trust setup
+# enable_zero_trust_integration = true
+# cloudflare_account_id         = "your-cloudflare-account-id"
+# cloudflare_zone_id           = "your-cloudflare-zone-id"
+# cloudflare_api_token         = "your-cloudflare-api-token"
+
+# Storage Configuration (Optional)
+# storage_account_name = "aksbackupsprd"  # For Velero backups
+# backup_retention_days = 30
+
+# Resource Tags (Optional)
+tags = {
+  Environment = "Production"
+  ManagedBy   = "Terraform"
+  Security    = "High"
+  Compliance  = "Required"
+  Project     = "RedDome-Lab"
+  Owner       = "Instructor"
+  Lab         = "DevSecOps"
+  CostCenter  = "IT-Security"
+  Department  = "Education"
+}
