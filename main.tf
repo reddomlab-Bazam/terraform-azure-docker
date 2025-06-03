@@ -54,34 +54,35 @@ module "networking" {
 }
 
 module "aks" {
-  source                  = "./modules/aks"
-  environment             = var.environment
-  location                = var.location
-  location_prefix         = var.location_prefix
-  resource_group_name     = module.networking.resource_group_name
-  subnet_id               = module.networking.aks_subnet_id
-  tags                    = var.tags
-  api_authorized_ranges   = var.api_authorized_ranges
-  enable_monitoring       = var.enable_monitoring
+  source                     = "./modules/aks"
+  environment               = var.environment
+  location                  = var.location
+  location_prefix           = var.location_prefix
+  resource_group_name       = module.networking.resource_group_name
+  subnet_id                 = module.networking.aks_subnet_id
+  tags                      = var.tags
+  api_authorized_ranges     = var.api_authorized_ranges
+  enable_monitoring         = var.enable_monitoring
   log_analytics_workspace_id = var.log_analytics_workspace_id
 }
 
-# First ensure the providers are properly initialized using the AKS cluster config
-module "wazuh" {
-  source     = "./modules/wazuh"
-  depends_on = [module.aks]
-}
-
-# Use a local-exec provisioner to ensure AKS is ready before deploying monitoring
+# Wait for AKS to be ready
 resource "null_resource" "wait_for_aks" {
   depends_on = [module.aks]
 
   provisioner "local-exec" {
-    command = "sleep 60"  # Give AKS time to fully initialize
+    command = "sleep 120"  # Increased wait time for stability
   }
 }
 
-# Then deploy the monitoring module
+# Deploy Wazuh first (as it's needed by Grafana for data source)
+module "wazuh" {
+  source      = "./modules/wazuh"
+  domain_name = var.domain_name  # ADDED: Pass domain name to Wazuh module
+  depends_on  = [null_resource.wait_for_aks]
+}
+
+# Then deploy the monitoring module with both Wazuh and Grafana
 module "monitoring" {
   source                          = "./modules/monitoring"
   grafana_admin_password          = var.grafana_admin_password
@@ -91,5 +92,5 @@ module "monitoring" {
   grafana_subdomain               = var.grafana_subdomain
   wazuh_subdomain                 = var.wazuh_subdomain
   
-  depends_on = [null_resource.wait_for_aks]
+  depends_on = [module.wazuh, null_resource.wait_for_aks]
 }

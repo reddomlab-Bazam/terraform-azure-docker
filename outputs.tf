@@ -60,7 +60,7 @@ output "wazuh_namespace" {
 # Connection Commands
 output "kubectl_config_command" {
   description = "Command to configure kubectl for this cluster"
-  value       = "az aks get-credentials --resource-group ${module.networking.resource_group_name} --name ${module.aks.cluster_name}"
+  value       = module.aks.kubectl_config_command
 }
 
 output "grafana_port_forward_command" {
@@ -145,11 +145,11 @@ output "infrastructure_summary" {
   }
 }
 
-# Terraform Cloud Integration
+# Terraform Cloud Integration - FIXED ORGANIZATION NAME
 output "terraform_workspace_info" {
   description = "Information about the Terraform workspace"
   value = {
-    organization = "gvolt"
+    organization = "reddomelabproject"  # Fixed to match main.tf
     workspace    = "terraform-azure-docker"
     environment  = var.environment
   }
