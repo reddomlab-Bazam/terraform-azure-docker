@@ -1,6 +1,6 @@
 terraform {
   backend "remote" {
-    organization = "gvolt"
+    organization = "reddomelabproject"
     workspaces {
       name = "terraform-azure-docker"
     }

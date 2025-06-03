@@ -1,25 +1,59 @@
+# Enhanced Prometheus configuration for Azure AKS
 alertmanager:
   enabled: true
   config:
     global:
       resolve_timeout: 5m
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'prometheus@${DOMAIN_NAME}'
     route:
-      group_by: ['job']
+      group_by: ['job', 'alertname']
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 12h
-      receiver: 'null'
+      receiver: 'default'
       routes:
       - match:
           alertname: Watchdog
         receiver: 'null'
+      - match:
+          severity: critical
+        receiver: 'critical'
+        group_wait: 10s
+        repeat_interval: 5m
     receivers:
     - name: 'null'
+    - name: 'default'
+      slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts'
+        title: 'Prometheus Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+    - name: 'critical'
+      slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#critical-alerts'
+        title: 'CRITICAL: Prometheus Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  persistence:
+    enabled: true
+    storageClass: "${STORAGE_CLASS}"
+    size: 10Gi
 
 grafana:
   enabled: false  # We're using our own Grafana installation
 
 prometheusOperator:
+  enabled: true
   resources:
     requests:
       cpu: 200m
@@ -27,21 +61,217 @@ prometheusOperator:
     limits:
       cpu: 400m
       memory: 400Mi
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    fsGroup: 65534
 
 prometheus:
+  enabled: true
   prometheusSpec:
-    retention: 15d
+    # Retention settings
+    retention: 30d
+    retentionSize: 45GB
+    
+    # Resource limits
     resources:
       requests:
-        cpu: 200m
-        memory: 400Mi
-      limits:
         cpu: 500m
-        memory: 1Gi
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    
+    # Storage configuration
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: managed-premium
+          storageClassName: "${STORAGE_CLASS}"
+          accessModes: ["ReadWriteOnce"]
           resources:
             requests:
               storage: 50Gi
+    
+    # Service discovery configuration
+    serviceDiscoveryNamespaceSelector:
+      matchLabels:
+        prometheus: enabled
+    
+    # Rule selector configuration
+    ruleSelector:
+      matchLabels:
+        prometheus: enabled
+    
+    # Service monitor selector
+    serviceMonitorSelector:
+      matchLabels:
+        prometheus: enabled
+    
+    # Pod monitor selector
+    podMonitorSelector:
+      matchLabels:
+        prometheus: enabled
+    
+    # Additional scrape configs
+    additionalScrapeConfigs:
+    - job_name: 'wazuh-manager'
+      static_configs:
+      - targets: ['wazuh-manager.wazuh.svc.cluster.local:55000']
+      metrics_path: '/api/cluster/healthcheck'
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      scrape_interval: 30s
+      scrape_timeout: 10s
+    
+    - job_name: 'wazuh-indexer'
+      static_configs:
+      - targets: ['wazuh-indexer-indexer.wazuh.svc.cluster.local:9200']
+      metrics_path: '/_prometheus/metrics'
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      scrape_interval: 30s
+      scrape_timeout: 10s
+    
+    - job_name: 'kubernetes-apiservers'
+      kubernetes_sd_configs:
+      - role: endpoints
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+    
+    - job_name: 'kubernetes-nodes'
+      kubernetes_sd_configs:
+      - role: node
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+    # Security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      fsGroup: 65534
+
+# Node exporter for system metrics
+nodeExporter:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      prometheus: enabled
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 50Mi
+    limits:
+      cpu: 100m
+      memory: 100Mi
+
+# Kube-state-metrics for Kubernetes object metrics
+kubeStateMetrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      prometheus: enabled
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 150Mi
+    limits:
+      cpu: 200m
+      memory: 300Mi
+
+# Default rules for monitoring
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: true
+    general: true
+    k8s: true
+    kubeApiserver: true
+    kubeApiserverAvailability: true
+    kubeApiserverError: true
+    kubeApiserverSlos: true
+    kubelet: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeAlerting: true
+    kubePrometheusNodeRecording: true
+    kubernetesAbsent: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    node: true
+    prometheus: true
+    prometheusOperator: true
+
+# Additional alert rules
+additionalPrometheusRules:
+- name: wazuh-alerts
+  groups:
+  - name: wazuh
+    rules:
+    - alert: WazuhManagerDown
+      expr: up{job="wazuh-manager"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Wazuh Manager is down"
+        description: "Wazuh Manager has been down for more than 5 minutes."
+    
+    - alert: WazuhIndexerDown
+      expr: up{job="wazuh-indexer"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Wazuh Indexer is down"
+        description: "Wazuh Indexer has been down for more than 5 minutes."
+    
+    - alert: HighCPUUsage
+      expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage detected"
+        description: "CPU usage is above 80% for more than 10 minutes."
+    
+    - alert: HighMemoryUsage
+      expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage detected"
+        description: "Memory usage is above 85% for more than 10 minutes."
+
+# ServiceMonitor for this Prometheus instance
+serviceMonitor:
+  enabled: true
+  labels:
+    prometheus: enabled
