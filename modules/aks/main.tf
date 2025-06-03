@@ -7,11 +7,11 @@ resource "azurerm_kubernetes_cluster" "aks" {
   sku_tier            = "Free"
 
   default_node_pool {
-    name            = "system"
-    node_count      = var.node_count
-    vm_size         = var.vm_size
-    vnet_subnet_id  = var.subnet_id
-    tags            = var.tags
+    name                = "system"
+    # REMOVED node_count as it conflicts with enable_auto_scaling
+    vm_size             = var.vm_size
+    vnet_subnet_id      = var.subnet_id
+    tags                = var.tags
     enable_auto_scaling = true
     min_count           = 1
     max_count           = 3
@@ -34,7 +34,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   azure_policy_enabled = true
   role_based_access_control_enabled = true
 
-  # API Server Access Profile - ADDED BACK
+  # API Server Access Profile
   api_server_access_profile {
     authorized_ip_ranges = var.api_authorized_ranges
   }
