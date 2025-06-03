@@ -115,7 +115,7 @@ resource "local_file" "deploy_wazuh_script" {
   file_permission = "0755"
 }
 
-# Execute the Wazuh deployment script - FIXED: Use bash explicitly and correct path
+# Execute the Wazuh deployment script - FIXED: Correct path reference
 resource "null_resource" "deploy_wazuh" {
   depends_on = [
     kubernetes_namespace.wazuh,
@@ -187,7 +187,7 @@ resource "kubernetes_config_map" "wazuh_config" {
         </auth>
 
         <cluster>
-          <n>wazuh</n>
+          <name>wazuh</name>
           <node_name>master-node</node_name>
           <node_type>master</node_type>
           <key></key>
@@ -320,7 +320,7 @@ resource "kubernetes_deployment" "wazuh_health_check" {
   depends_on = [kubernetes_namespace.wazuh]
 }
 
-# Network policy for Wazuh namespace - FIXED: Proper peer specifications
+# Network policy for Wazuh namespace - COMPLETELY FIXED
 resource "kubernetes_network_policy" "wazuh_network_policy" {
   metadata {
     name      = "wazuh-network-policy"
@@ -372,27 +372,22 @@ resource "kubernetes_network_policy" "wazuh_network_policy" {
         }
       }
       
-      # Allow egress within wazuh namespace
+      # Allow egress within wazuh namespace  
       to {
         pod_selector {}
       }
       
-      # Allow DNS resolution
-      to {}
+      # DNS and external access - FIXED: Proper port-only rules
       ports {
         protocol = "UDP"
         port     = "53"
       }
       
-      # Allow HTTPS for updates and external connectivity
-      to {}
       ports {
         protocol = "TCP"
         port     = "443"
       }
       
-      # Allow HTTP for internal communication
-      to {}
       ports {
         protocol = "TCP"
         port     = "80"
