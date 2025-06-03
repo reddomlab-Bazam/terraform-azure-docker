@@ -58,8 +58,8 @@ resource "local_file" "deploy_wazuh_script" {
     fi
     
     # Create a temporary directory for Wazuh manifests
-    TEMP_DIR=$(mktemp -d)
-    cd $TEMP_DIR
+    TEMP_DIR=$$(mktemp -d)
+    cd $$TEMP_DIR
     
     echo "Downloading Wazuh Kubernetes manifests..."
     
@@ -105,10 +105,10 @@ resource "local_file" "deploy_wazuh_script" {
     kubectl get services -n wazuh
     
     # Clean up
-    rm -rf $TEMP_DIR
+    rm -rf $$TEMP_DIR
     
     echo "Wazuh deployment completed successfully!"
-    echo "Access the dashboard at: https://wazuh.${DOMAIN_NAME:-your-domain.com}"
+    echo "Access the dashboard at: https://wazuh.$${DOMAIN_NAME:-reddomelab.com}"
     echo "Default credentials: admin/admin (change after first login)"
   EOT
 
