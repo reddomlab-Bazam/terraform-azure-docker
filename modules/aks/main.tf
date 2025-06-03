@@ -34,7 +34,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   azure_policy_enabled = true
   role_based_access_control_enabled = true
 
-  # Removed API server access profile 
+  # API Server Access Profile - ADDED BACK
+  api_server_access_profile {
+    authorized_ip_ranges = var.api_authorized_ranges
+  }
 
   microsoft_defender {
     log_analytics_workspace_id = var.log_analytics_workspace_id
