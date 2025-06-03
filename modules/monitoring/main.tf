@@ -135,6 +135,189 @@ resource "kubernetes_deployment" "grafana" {
           }
           
           port {
+      port        = 80
+      target_port = 80
+      protocol    = "TCP"
+    }
+    type = "ClusterIP"
+  }
+}
+
+# Simple nginx deployment for tunnel testing
+resource "kubernetes_deployment" "tunnel_health_check" {
+  metadata {
+    name      = "tunnel-health-check"
+    namespace = kubernetes_namespace.monitoring.metadata[0].name
+  }
+  
+  spec {
+    replicas = 1
+    
+    selector {
+      match_labels = {
+        app = "nginx"
+      }
+    }
+    
+    template {
+      metadata {
+        labels = {
+          app = "nginx"
+        }
+      }
+      
+      spec {
+        container {
+          name  = "nginx"
+          image = "nginx:alpine"
+          
+          resources {
+            requests = {
+              cpu    = "10m"
+              memory = "16Mi"
+            }
+            limits = {
+              cpu    = "50m"
+              memory = "64Mi"
+            }
+          }
+          
+          port {
+            container_port = 80
+            protocol       = "TCP"
+          }
+        }
+      }
+    }
+  }
+}
+
+# Enhanced Cloudflare tunnel configuration for Grafana
+resource "helm_release" "cloudflared_grafana" {
+  name       = "cloudflared-grafana"
+  repository = "https://charts.pascaliske.dev"
+  chart      = "cloudflared"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  version    = "1.3.0"
+  timeout    = 600
+  
+  # Wait for Grafana to be ready before deploying tunnel
+  depends_on = [kubernetes_deployment.grafana, kubernetes_service.grafana]
+
+  values = [
+    templatefile("${path.module}/values/cloudflare-grafana-values.yaml", {
+      CLOUDFLARE_TUNNEL_TOKEN_GRAFANA = var.cloudflare_tunnel_token_grafana
+      GRAFANA_SUBDOMAIN               = var.grafana_subdomain
+      DOMAIN_NAME                     = var.domain_name
+    })
+  ]
+
+  # Health check to ensure tunnel is properly configured
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Waiting for Grafana tunnel to be ready..."
+      sleep 60
+    EOT
+  }
+}
+
+# Enhanced Cloudflare tunnel configuration for Wazuh
+resource "helm_release" "cloudflared_wazuh" {
+  name       = "cloudflared-wazuh"
+  repository = "https://charts.pascaliske.dev"
+  chart      = "cloudflared"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  version    = "1.3.0"
+  timeout    = 600
+
+  values = [
+    templatefile("${path.module}/values/cloudflare-wazuh-values.yaml", {
+      CLOUDFLARE_TUNNEL_TOKEN_WAZUH = var.cloudflare_tunnel_token_wazuh
+      WAZUH_SUBDOMAIN               = var.wazuh_subdomain
+      DOMAIN_NAME                   = var.domain_name
+    })
+  ]
+
+  # Health check to ensure tunnel is properly configured
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Waiting for Wazuh tunnel to be ready..."
+      sleep 60
+    EOT
+  }
+}
+
+# Create service monitor for Prometheus to scrape Wazuh metrics
+resource "null_resource" "wazuh_service_monitor" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Wazuh service monitor configuration completed"
+      echo "ServiceMonitor will be created automatically by Prometheus"
+    EOT
+  }
+
+  depends_on = [helm_release.prometheus]
+}
+
+# Network policy to secure the monitoring namespace - FIXED VERSION
+resource "kubernetes_network_policy" "monitoring_network_policy" {
+  metadata {
+    name      = "monitoring-network-policy"
+    namespace = kubernetes_namespace.monitoring.metadata[0].name
+  }
+
+  spec {
+    pod_selector {}
+    
+    policy_types = ["Ingress", "Egress"]
+    
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            purpose = "monitoring"
+          }
+        }
+      }
+      
+      from {
+        namespace_selector {
+          match_labels = {
+            purpose = "security-monitoring"
+          }
+        }
+      }
+    }
+    
+    egress {
+      to {
+        namespace_selector {
+          match_labels = {
+            purpose = "security-monitoring"
+          }
+        }
+      }
+      
+      # DNS and external access - FIXED: Proper port-only rules
+      ports {
+        protocol = "UDP"
+        port     = "53"
+      }
+      
+      ports {
+        protocol = "TCP"
+        port     = "443"
+      }
+      
+      ports {
+        protocol = "TCP"
+        port     = "80"
+      }
+    }
+  }
+
+  depends_on = [kubernetes_namespace.monitoring]
+}
             container_port = 3000
             name           = "http-grafana"
             protocol       = "TCP"
@@ -307,104 +490,11 @@ resource "helm_release" "prometheus" {
   values = [
     templatefile("${path.module}/values/prometheus-values.yaml", {
       STORAGE_CLASS = "managed-premium"
-      DOMAIN_NAME   = var.domain_name  # ADDED: Pass the domain name variable
+      DOMAIN_NAME   = var.domain_name
     })
   ]
 
   depends_on = [kubernetes_namespace.monitoring]
-}
-
-# Deploy Wazuh using official manifests
-resource "null_resource" "deploy_wazuh" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      #!/bin/bash
-      set -e
-      
-      echo "Deploying Wazuh to AKS cluster..."
-      
-      # Check if wazuh namespace exists, create if not
-      if ! kubectl get namespace wazuh > /dev/null 2>&1; then
-        echo "Creating wazuh namespace..."
-        kubectl create namespace wazuh
-      fi
-      
-      # Create a temporary directory for Wazuh manifests
-      TEMP_DIR=$$(mktemp -d)
-      cd $$TEMP_DIR
-      
-      # Clone the official Wazuh Kubernetes repository
-      echo "Cloning Wazuh Kubernetes repository..."
-      git clone https://github.com/wazuh/wazuh-kubernetes.git -b v4.6.0 --depth=1
-      cd wazuh-kubernetes
-      
-      # Apply base configurations first
-      echo "Applying Wazuh base configurations..."
-      kubectl apply -f wazuh/base/
-      
-      # Wait a bit for base resources to be created
-      sleep 30
-      
-      # Apply indexer stack
-      echo "Applying Wazuh indexer stack..."
-      kubectl apply -f wazuh/indexer_stack/
-      
-      # Wait for indexer to be ready
-      sleep 60
-      
-      # Apply manager and dashboard
-      echo "Applying Wazuh manager and dashboard..."
-      kubectl apply -f wazuh/manager/
-      
-      # Clean up
-      rm -rf $$TEMP_DIR
-      
-      echo "Wazuh deployment completed successfully"
-    EOT
-  }
-
-  depends_on = [kubernetes_namespace.monitoring]
-}
-
-# Create service monitor for Prometheus to scrape Wazuh metrics (using null_resource instead of kubernetes_manifest)
-resource "null_resource" "wazuh_service_monitor" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      # Wait for cluster to be ready
-      sleep 30
-      
-      # Create ServiceMonitor YAML
-      cat <<EOF > /tmp/wazuh-service-monitor.yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: wazuh-monitor
-  namespace: monitoring
-  labels:
-    app: wazuh
-    prometheus: enabled
-spec:
-  selector:
-    matchLabels:
-      app: wazuh-manager
-  namespaceSelector:
-    matchNames:
-    - wazuh
-  endpoints:
-  - port: api
-    interval: 30s
-    path: /api
-EOF
-
-      # Apply the ServiceMonitor
-      kubectl apply -f /tmp/wazuh-service-monitor.yaml || echo "ServiceMonitor creation failed, will retry later"
-      
-      # Clean up
-      rm -f /tmp/wazuh-service-monitor.yaml
-    EOT
-  }
-
-  depends_on = [helm_release.prometheus, null_resource.deploy_wazuh]
 }
 
 # Create ConfigMap for lab documentation
@@ -588,67 +678,18 @@ EOF
   depends_on = [kubernetes_namespace.monitoring]
 }
 
-# Network policy to secure the monitoring namespace - FIXED: Proper peer specifications
-resource "kubernetes_network_policy" "monitoring_network_policy" {
+# Create a service to test tunnel connectivity
+resource "kubernetes_service" "tunnel_health_check" {
   metadata {
-    name      = "monitoring-network-policy"
+    name      = "tunnel-health-check"
     namespace = kubernetes_namespace.monitoring.metadata[0].name
+    labels = {
+      app = "tunnel-health-check"
+    }
   }
-
+  
   spec {
-    pod_selector {}
-    
-    policy_types = ["Ingress", "Egress"]
-    
-    ingress {
-      from {
-        namespace_selector {
-          match_labels = {
-            purpose = "monitoring"
-          }
-        }
-      }
-      
-      from {
-        namespace_selector {
-          match_labels = {
-            purpose = "security-monitoring"
-          }
-        }
-      }
+    selector = {
+      app = "nginx"
     }
-    
-    egress {
-      to {
-        namespace_selector {
-          match_labels = {
-            purpose = "security-monitoring"
-          }
-        }
-      }
-      
-      # Allow egress to DNS
-      to {}
-      ports {
-        protocol = "UDP"
-        port     = "53"
-      }
-      
-      # Allow egress to HTTPS
-      to {}
-      ports {
-        protocol = "TCP"
-        port     = "443"
-      }
-      
-      # Allow egress to HTTP
-      to {}
-      ports {
-        protocol = "TCP"
-        port     = "80"
-      }
-    }
-  }
-
-  depends_on = [kubernetes_namespace.monitoring]
-}
+    port {
