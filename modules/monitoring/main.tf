@@ -245,74 +245,10 @@ resource "kubernetes_service" "grafana" {
   depends_on = [kubernetes_deployment.grafana]
 }
 
-# MUCH simpler Prometheus deployment - just core prometheus
-resource "helm_release" "prometheus" {
-  name       = "prometheus"
-  repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "prometheus"  # Just prometheus, not the full stack
-  namespace  = kubernetes_namespace.monitoring.metadata[0].name
-  version    = "25.8.0"
-  timeout    = 180  # 3 minutes
-  
-  # Minimal configuration for faster deployment
-  set {
-    name  = "server.retention"
-    value = "7d"
-  }
-  
-  set {
-    name  = "server.persistentVolume.storageClass"
-    value = "managed-premium"
-  }
-  
-  set {
-    name  = "server.persistentVolume.size"
-    value = "5Gi"  # Even smaller
-  }
-  
-  set {
-    name  = "server.resources.requests.memory"
-    value = "256Mi"  # Much smaller
-  }
-  
-  set {
-    name  = "server.resources.requests.cpu"
-    value = "100m"  # Much smaller
-  }
-  
-  set {
-    name  = "server.resources.limits.memory"
-    value = "512Mi"
-  }
-  
-  set {
-    name  = "server.resources.limits.cpu"
-    value = "200m"
-  }
-  
-  # Disable components we don't need
-  set {
-    name  = "alertmanager.enabled"
-    value = "false"
-  }
-  
-  set {
-    name  = "prometheus-pushgateway.enabled"
-    value = "false"
-  }
-  
-  set {
-    name  = "kube-state-metrics.enabled"
-    value = "false"  # Disable for now
-  }
-  
-  set {
-    name  = "prometheus-node-exporter.enabled"
-    value = "false"  # Disable for now
-  }
-
-  depends_on = [kubernetes_namespace.monitoring]
-}
+# Prometheus removed - focusing on Grafana and Wazuh only
+# resource "helm_release" "prometheus" {
+#   # Commented out - not needed for this lab
+# }
 
 # Create ConfigMap for lab documentation
 resource "kubernetes_config_map" "lab_documentation" {
