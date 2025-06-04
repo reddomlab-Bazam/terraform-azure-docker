@@ -7,9 +7,7 @@ tunnel:
 
 ingress:
   - hostname: "${GRAFANA_SUBDOMAIN}.${DOMAIN_NAME}"
-    service: grafana
-    path: "/"
-    port: 3000
+    service: http://grafana.monitoring.svc.cluster.local:3000
 
 config:
   http2Origin: true
